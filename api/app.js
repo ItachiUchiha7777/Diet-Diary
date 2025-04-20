@@ -18,5 +18,7 @@ app.use(cors());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/meals', mealRoutes);
-
+app.get('/', (req, res) => {
+    res.send('Server is up and running! 🚀');
+  });
 module.exports = app;
