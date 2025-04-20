@@ -14,6 +14,9 @@ const MealSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a meal tag'],
   },
+  note:{
+type: String,
+  },
   date: {
     type: Date,
     default: Date.now,
