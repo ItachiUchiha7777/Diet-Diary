@@ -1,16 +1,22 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Appbar,
   Card,
   Title,
   Paragraph,
   Chip,
-  useTheme,Text
+  useTheme,
+  Text,
+  ActivityIndicator
 } from 'react-native-paper';
+import { getMealDetails } from '../api';
+import { Alert,View } from 'react-native';
 
 export default function MealDetailsScreen({ route, navigation }) {
-  const { meal } = route.params;
+  const { mealId } = route.params;
   const { colors } = useTheme();
+  const [meal, setMeal] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const tagColors = {
     breakfast: '#FFD54F',
@@ -19,6 +25,37 @@ export default function MealDetailsScreen({ route, navigation }) {
     snack: '#81C784',
     cheat: '#FF8A65'
   };
+
+  useEffect(() => {
+    const fetchMealDetails = async () => {
+      try {
+        const data = await getMealDetails(mealId);
+        setMeal(data);
+      } catch (error) {
+        Alert.alert('Error', 'Failed to fetch meal details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMealDetails();
+  }, [mealId]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator animating={true} size="large" />
+      </View>
+    );
+  }
+
+  if (!meal) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Meal not found</Text>
+      </View>
+    );
+  }
 
   return (
     <>

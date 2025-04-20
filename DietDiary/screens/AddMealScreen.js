@@ -8,7 +8,7 @@ import {
   HelperText,
   Menu,
   Divider,
-  useTheme
+  useTheme,ActivityIndicator
 } from 'react-native-paper';
 import { View, StyleSheet } from 'react-native';
 
@@ -17,9 +17,10 @@ export default function AddMealModal({ visible, onClose, onAddMeal }) {
   const [name, setName] = useState('');
   const [tag, setTag] = useState('breakfast');
   const [menuVisible, setMenuVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const tags = [
-    { label: 'Breakfast', value: 'breakfast', icon: 'sunny' },
+    { label: 'Breakfast', value: 'breakfast', icon: 'weather-sunny' },
     { label: 'Lunch', value: 'lunch', icon: 'silverware-fork-knife' },
     { label: 'Dinner', value: 'dinner', icon: 'moon-waning-crescent' },
     { label: 'Snack', value: 'snack', icon: 'food-apple' },
@@ -28,16 +29,24 @@ export default function AddMealModal({ visible, onClose, onAddMeal }) {
 
   const selectedTag = tags.find(t => t.value === tag) || tags[0];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim()) return;
-    onAddMeal({ 
-      name, 
-      tag,
-      date: new Date().toISOString() 
-    });
-    setName('');
-    setTag('breakfast');
-    onClose();
+    
+    setLoading(true);
+    try {
+      await onAddMeal({ 
+        name, 
+        tag,
+        date: new Date().toISOString() 
+      });
+      setName('');
+      setTag('breakfast');
+      onClose();
+    } catch (error) {
+      // Error is handled in parent component
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -102,14 +111,18 @@ export default function AddMealModal({ visible, onClose, onAddMeal }) {
           </Menu>
         </View>
 
-        <Button 
-          mode="contained" 
-          onPress={handleSubmit}
-          style={{ marginTop: 24 }}
-          disabled={!name.trim()}
-        >
-          Add Meal
-        </Button>
+        {loading ? (
+          <ActivityIndicator animating={true} style={{ marginTop: 24 }} />
+        ) : (
+          <Button 
+            mode="contained" 
+            onPress={handleSubmit}
+            style={{ marginTop: 24 }}
+            disabled={!name.trim()}
+          >
+            Add Meal
+          </Button>
+        )}
       </Modal>
     </Portal>
   );

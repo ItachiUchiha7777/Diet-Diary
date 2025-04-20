@@ -6,33 +6,108 @@ import {
   Text,
   Card,
   useTheme,
-  HelperText
+  HelperText,
+  ActivityIndicator
 } from 'react-native-paper';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
+import { register, login } from '../api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../App'; // Import the useAuth hook
 
-export default function AuthScreen({ navigation }) {
+export default function AuthScreen() {
   const { colors } = useTheme();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { signIn } = useAuth(); // Use the signIn function from context
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: ''
+  });
   const [isLogin, setIsLogin] = useState(true);
   const [secureText, setSecureText] = useState(true);
-  const [emailError, setEmailError] = useState('');
+  const [errors, setErrors] = useState({
+    email: '',
+    general: ''
+  });
+  const [loading, setLoading] = useState(false);
 
-  const validateEmail = (email) => {
-    const re = /\S+@\S+\.\S+/;
-    return re.test(email);
-  };
+  const validateForm = () => {
+    let valid = true;
+    const newErrors = { email: '', general: '' };
 
-  const handleAuth = () => {
-    if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email');
-      return;
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+      valid = false;
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email';
+      valid = false;
     }
-    setEmailError('');
-    navigation.navigate('Main');
+
+    if (!formData.password) {
+      newErrors.general = 'Password is required';
+      valid = false;
+    } else if (formData.password.length < 6) {
+      newErrors.general = 'Password must be at least 6 characters';
+      valid = false;
+    }
+
+    if (!isLogin && !formData.name.trim()) {
+      newErrors.general = 'Name is required';
+      valid = false;
+    }
+
+    setErrors(newErrors);
+    return valid;
   };
 
+  const handleAuth = async () => {
+    if (!validateForm()) return;
+  
+    setLoading(true);
+    setErrors({ email: '', general: '' });
+  
+    try {
+      let response;
+      if (isLogin) {
+        response = await login(formData.email, formData.password);
+      } else {
+        response = await register(formData.name, formData.email, formData.password);
+      }
+      
+      // Ensure response contains user and token before saving
+      if (response && response.token) {
+        // Store user data if needed
+        if (response.username) {
+          await AsyncStorage.setItem('user', JSON.stringify(response.username));
+        }
+        
+        // Use the signIn function from context - this will update the auth state
+        signIn(response.token);
+      } else {
+        throw new Error('Authentication failed. No token returned.');
+      }
+    } catch (error) {
+      console.error('Authentication error:', error);
+      setErrors(prev => ({ ...prev, general: error.message }));
+      Alert.alert(
+        'Error',
+        error.message || 'Something went wrong. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error when user types
+    if (errors[field] || errors.general) {
+      setErrors(prev => ({ ...prev, [field]: '', general: '' }));
+    }
+  };
+
+  // Rest of your component remains the same
+  // ...
+  
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Card style={styles.card}>
@@ -44,33 +119,34 @@ export default function AuthScreen({ navigation }) {
           {!isLogin && (
             <TextInput
               label="Full Name"
-              value={name}
-              onChangeText={setName}
+              value={formData.name}
+              onChangeText={(text) => handleChange('name', text)}
               style={styles.input}
               mode="outlined"
               left={<TextInput.Icon name="account" />}
+              error={!!errors.general && !isLogin}
             />
           )}
 
           <TextInput
             label="Email"
-            value={email}
-            onChangeText={setEmail}
+            value={formData.email}
+            onChangeText={(text) => handleChange('email', text)}
             style={styles.input}
             mode="outlined"
             keyboardType="email-address"
             autoCapitalize="none"
             left={<TextInput.Icon name="email" />}
-            error={!!emailError}
+            error={!!errors.email}
           />
-          <HelperText type="error" visible={!!emailError}>
-            {emailError}
+          <HelperText type="error" visible={!!errors.email}>
+            {errors.email}
           </HelperText>
 
           <TextInput
             label="Password"
-            value={password}
-            onChangeText={setPassword}
+            value={formData.password}
+            onChangeText={(text) => handleChange('password', text)}
             style={styles.input}
             mode="outlined"
             secureTextEntry={secureText}
@@ -81,21 +157,34 @@ export default function AuthScreen({ navigation }) {
                 onPress={() => setSecureText(!secureText)} 
               />
             }
+            error={!!errors.general}
           />
+          <HelperText type="error" visible={!!errors.general}>
+            {errors.general}
+          </HelperText>
+
+          {loading ? (
+            <ActivityIndicator animating={true} style={styles.loading} />
+          ) : (
+            <Button 
+              mode="contained" 
+              onPress={handleAuth}
+              style={styles.button}
+              labelStyle={styles.buttonLabel}
+              disabled={loading}
+            >
+              {isLogin ? 'Login' : 'Register'}
+            </Button>
+          )}
 
           <Button 
-            mode="contained" 
-            onPress={handleAuth}
-            style={styles.button}
-            labelStyle={styles.buttonLabel}
-          >
-            {isLogin ? 'Login' : 'Register'}
-          </Button>
-
-          <Button 
-            onPress={() => setIsLogin(!isLogin)}
+            onPress={() => {
+              setIsLogin(!isLogin);
+              setErrors({ email: '', general: '' });
+            }}
             style={styles.switchButton}
             labelStyle={{ color: colors.primary }}
+            disabled={loading}
           >
             {isLogin ? 'Need an account? Register' : 'Have an account? Login'}
           </Button>
@@ -130,6 +219,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   switchButton: {
+    marginTop: 16,
+  },
+  loading: {
     marginTop: 16,
   },
 });
