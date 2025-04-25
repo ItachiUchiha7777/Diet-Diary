@@ -107,9 +107,10 @@ exports.getMe = asyncHandler(async (req, res, next) => {
 // @route   GET /api/auth/logout
 // @access  Private
 exports.logout = asyncHandler(async (req, res, next) => {
-  res.cookie('token', 'none', {
-    expires: new Date(Date.now() + 10 * 1000),
+  res.clearCookie("token", {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Strict",
   });
 
   res.status(200).json({
